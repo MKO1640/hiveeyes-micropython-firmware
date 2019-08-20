@@ -3,13 +3,21 @@
 # General settings.
 main = {
 
-    # Measurement interval in seconds.
-    # TODO: Please note this is not the _real thing_ yet at it will just use
+    # Measurement intervals in seconds.
+    # Todo: Please note this is not the _real thing_ yet at it will just use
     #       this value to apply to ``time.sleep()`` after each duty cycle.
-    'interval': 15.0,
+    'interval': {
+
+        # Apply this interval if device is in field mode.
+        'field': 60.0,
+
+        # Apply this interval if device is in maintenance mode.
+        # https://community.hiveeyes.org/t/wartungsmodus-fur-den-terkin-datenlogger/2274
+        'maintenance': 15.0,
+    },
 
     # Whether to use deep sleep between measurement cycles.
-    'deepsleep': True,
+    'deepsleep': False,
 
     # Configure logging.
     'logging': {
@@ -28,14 +36,35 @@ main = {
         'enabled': False,
 
         # Watchdog timeout in milliseconds.
-        'timeout': 20000,
+        'timeout': 60000,
     },
+
+    # Configure backup.
+    'backup': {
+        # How many backup files to keep around.
+        'file_count': 7,
+    },
+
+    # Whether to skip LTE modem deinit on startup. This will save ~6 seconds.
+    'fastboot': False,
 
     # Configure RGB-LED.
     'rgb_led': {
         'heartbeat': True,
     },
 
+}
+
+# Control the services offered by the device.
+services = {
+    'api': {
+        'modeserver': {
+            'enabled': True,
+        },
+        'http': {
+            'enabled': True,
+        },
+    },
 }
 
 # Interface settings.
@@ -83,6 +112,7 @@ telemetry = {
 
             # Define telemetry endpoint and address information.
             'endpoint': 'mqtt://swarm.hiveeyes.org',
+            #'endpoint': 'mqtt://username:password@swarm.hiveeyes.org',
             'topology': 'mqttkit',
             'address': {
                 "realm": "hiveeyes",
@@ -110,6 +140,10 @@ telemetry = {
 
 # Sensor configuration.
 sensors = {
+
+    # Whether to prettify sensor log output.
+    'prettify_log': True,
+
     'system': {
 
         # Adjust voltage divider resistor values matching the board.
@@ -145,24 +179,55 @@ sensors = {
             'enabled': False,
         },
     },
-    'registry': {
-        'hx711': {
-            'address': 0x00,
+    'environment': [
+        {
+            'id': 'scale-1',
+            'number': 0,
+            'name': 'scale',
+            'description': 'Waage 1',
+            'type': 'HX711',
+            'enabled': True,
             'pin_dout': 'P22',
             'pin_pdsck': 'P21',
             'scale': 4.424242,
-            'offset': -73000.0,
+            'offset': -73000,
         },
-        'ds18x20': {
+        {
+            'id': 'ds18b20-1',
+            'name': 'temperature',
+            'description': 'Wabengasse 1',
+            'type': 'DS18B20',
+            'enabled': True,
             'bus': 'onewire:0',
+            'devices': [
+                {
+                    'id': 'ds18b20-w1r1',
+                    'address': '1111111111111111',
+                    'description': 'Wabengasse 1, Rahmen 1',
+                    'enabled': True,
+                    #'offset': 0.42,
+                },
+                {
+                    'id': 'ds18b20-w1r2',
+                    'address': '2222222222222222',
+                    'description': 'Wabengasse 1, Rahmen 2',
+                    'enabled': True,
+                    #'offset': -0.42,
+                },
+            ],
         },
-        'bme280': {
+        {
+            'id': 'bme280-1',
+            'description': 'Temperatur und Feuchte außen',
+            'type': 'BME280',
+            'enabled': True,
             'bus': 'i2c:0',
             'address': 0x77,
         },
-    },
+    ],
     'busses': [
         {
+            "id": "bus-i2c-0",
             "family": "i2c",
             "number": 0,
             "enabled": True,
@@ -170,6 +235,7 @@ sensors = {
             "pin_scl": "P10",
         },
         {
+            "id": "bus-onewire-0",
             "family": "onewire",
             "number": 0,
             "enabled": True,
@@ -188,11 +254,30 @@ sensors = {
 # HTTP API and captive portal.
 sensor_telemetry_map = {
     "_version": "1.0.0",
+
+    # Waage
+    "weight.0": "weight_kg",
+
+    # BME280
     "temperature.0x77.i2c:0": "t",
     "humidity.0x77.i2c:0": "h",
     "pressure.0x77.i2c:0": "p",
-    "weight.0": "weight",
-    "temperature.28ff641d8fdf18c1.onewire:0": "t_i_1",
-    "temperature.28ff641d8fc3944f.onewire:0": "t_i_2",
-    "system.temperature": "t_i_5",
+
+    # DS18B20
+    "temperature.1111111111111111.onewire:0": "t_i_1",
+    "temperature.2222222222222222.onewire:0": "t_i_2",
+    "temperature.3333333333333333.onewire:0": "t_i_3",
+    "temperature.4444444444444444.onewire:0": "t_i_4",
+    "temperature.5555555555555555.onewire:0": "t_i_5",
+    "temperature.6666666666666666.onewire:0": "t_o",
+
+    # Signalstärke
+    "system.wifi.rssi": "rssi",
+
+    # Sendeleistung
+    "system.wifi.max_tx_power": "snr",
+
+    # Batteriespannung
+    "system.voltage": "bv",
+
 }

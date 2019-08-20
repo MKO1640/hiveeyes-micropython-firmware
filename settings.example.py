@@ -3,13 +3,21 @@
 # General settings.
 main = {
 
-    # Measurement interval in seconds.
-    # TODO: Please note this is not the _real thing_ yet at it will just use
+    # Measurement intervals in seconds.
+    # Todo: Please note this is not the _real thing_ yet at it will just use
     #       this value to apply to ``time.sleep()`` after each duty cycle.
-    'interval': 15.0,
+    'interval': {
+
+        # Apply this interval if device is in field mode.
+        'field': 60.0,
+
+        # Apply this interval if device is in maintenance mode.
+        # https://community.hiveeyes.org/t/wartungsmodus-fur-den-terkin-datenlogger/2274
+        'maintenance': 15.0,
+    },
 
     # Whether to use deep sleep between measurement cycles.
-    'deepsleep': True,
+    'deepsleep': False,
 
     # Configure logging.
     'logging': {
@@ -28,14 +36,35 @@ main = {
         'enabled': False,
 
         # Watchdog timeout in milliseconds.
-        'timeout': 20000,
+        'timeout': 60000,
     },
+
+    # Configure backup.
+    'backup': {
+        # How many backup files to keep around.
+        'file_count': 7,
+    },
+
+    # Whether to skip LTE modem deinit on startup. This will save ~6 seconds.
+    'fastboot': False,
 
     # Configure RGB-LED.
     'rgb_led': {
         'heartbeat': True,
     },
 
+}
+
+# Control the services offered by the device.
+services = {
+    'api': {
+        'modeserver': {
+            'enabled': True,
+        },
+        'http': {
+            'enabled': True,
+        },
+    },
 }
 
 # Interface settings.
@@ -94,6 +123,7 @@ telemetry = {
 
             # Define telemetry endpoint and address information.
             'endpoint': 'mqtt://daq.example.org',
+            #'endpoint': 'mqtt://username:password@daq.example.org',
             'topology': 'mqttkit',
             'address': {
                 "realm": "workbench",
@@ -158,6 +188,10 @@ telemetry = {
 
 # Sensor configuration.
 sensors = {
+
+    # Whether to prettify sensor log output.
+    'prettify_log': True,
+
     'system': {
 
         # Adjust voltage divider resistor values matching the board.
@@ -193,27 +227,55 @@ sensors = {
             'enabled': False,
         },
     },
-    'registry': {
-        'hx711': {
-            'address': 0x00,
+    'environment': [
+        {
+            'id': 'scale-1',
+            'number': 0,
+            'name': 'scale',
+            'description': 'Waage 1',
+            'type': 'HX711',
+            'enabled': True,
             'pin_dout': 'P22',
             'pin_pdsck': 'P21',
             'scale': 4.424242,
-            'offset': -73000.0,
+            'offset': -73000,
         },
-        'ds18x20': {
+        {
+            'id': 'ds18b20-1',
+            'name': 'temperature',
+            'description': 'Wabengasse 1',
+            'type': 'DS18B20',
+            'enabled': True,
             'bus': 'onewire:0',
+            'devices': [
+                {
+                    'id': 'ds18b20-r1c1',
+                    'address': '1111111111111111',
+                    'description': 'Reihe 1, Spalte 1',
+                    'enabled': True,
+                    #'offset': 0.42,
+                },
+                {
+                    'id': 'ds18b20-r1c2',
+                    'address': '2222222222222222',
+                    'description': 'Reihe 1, Spalte 2',
+                    'enabled': True,
+                    #'offset': -0.42,
+                },
+            ],
         },
-        'bme280_1': {
+        {
+            'id': 'bme280-1',
+            'description': 'Temperatur und Feuchte außen',
+            'type': 'BME280',
+            'enabled': True,
             'bus': 'i2c:0',
-        },
-        'bme280_2': {
-            'bus': 'i2c:1',
             'address': 0x77,
         },
-    },
+    ],
     'busses': [
         {
+            "id": "bus-i2c-0",
             "family": "i2c",
             "number": 0,
             "enabled": True,
@@ -221,6 +283,7 @@ sensors = {
             "pin_scl": "P10",
         },
         {
+            "id": "bus-i2c-1",
             "family": "i2c",
             "number": 1,
             "enabled": False,
@@ -228,6 +291,7 @@ sensors = {
             "pin_scl": "P21",
         },
         {
+            "id": "bus-onewire-0",
             "family": "onewire",
             "number": 0,
             "enabled": True,

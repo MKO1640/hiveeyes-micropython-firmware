@@ -1,9 +1,16 @@
-micropython-copy
-micropython-types
+pycopy-copy
+pycopy-types
 micropython-collections
 micropython-collections.defaultdict
-micropython-urequests
-# Apply cherrypick-style installation for some packages to ignore dependencies
-#micropython-urllib.parse
-#micropython-base64
-#micropython-logging
+pycopy-urequests
+pycopy-shutil
+# All of these pull in dependencies of vanilla MicroPython
+# essentially breaking Pycom MicroPython.
+#pycopy-abc
+#pycopy-glob
+#pycopy-os.path
+#pycopy-datetime
+#pycopy-urllib.parse
+#pycopy-base64
+#pycopy-logging
+#pycopy-json

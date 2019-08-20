@@ -5,7 +5,141 @@ Hiveeyes MicroPython Datalogger CHANGES
 
 Development
 ===========
+
+
+2019-08-19 0.6.0
+================
 - Explicitly ``deinit()`` LTE modem on each startup
+- Fix ``settings.example-bob.py``. Thanks, `@MKO1640`_ and `@ClemensGruber`_.
+- Improve formatting of BEEP telemetry field mapping for BOB
+- Disable telemetry adapter offline state for now
+- Disable DEBUG log level for system sensors
+- Add the "maintenance" device status / mode
+- Add UDP mode server for signalling the device into maintenance mode
+- Add device discovery and UDP client for signalling maintenance mode
+- Attempt to fix woes with IPv6 addresses from ``terkin.py``
+- Skip networks like 127.0.0.0/8 and 169.254.0.0/16 for ``terkin.py``
+- Make "terkin.py" handle multiple MAC address prefixes
+  coming from different Pycom devices. Now: WiPy, FiPy.
+- Optionally read MAC address from command line in order to
+  discover and maintain specific device
+- Add MQTT authentication
+- Update documentation
+- Improve rshell access over IP
+- Rename environment variable ``MCU_SERIAL_PORT`` to ``MCU_PORT``
+  for configuring both USB/UART port and IP address
+- Use offset values for DS18B20 sensors from settings
+- Enable/disable individual sensors per settings
+- Install MicroWebSrv and MicroDNSSrv libraries into ``dist-packages`` folder
+- Add singleton factory method to ``TerkinDatalogger``. Thanks, `@DieDiren`_.
+- Increase timeout for ARP ping requests with "terkin.py"
+- Use most recent "dotty_dict" module
+- Properly format MAC addresses
+- Add maintenance mode interval to configuration settings
+- Lazily import "ButtonManager" for trimming #11
+- Improve MAC address parsing and formatting
+- Improve MAC address normalization by also removing dashes and dots
+- Follow the Pycopy MicroPython fork, standard library wise
+- Upgrade to Dotty Dict 1.1.1. Thanks, `@pawelzny`_.
+- Improve sandbox tooling incl. FTP source code upload
+- DS18B20: Extend time between starting the
+  conversion and reading the sensor to one second.
+- Add MiniNet helper and corresponding ``Makefile`` rule ``wifi-connect``
+- Ship configuration blueprint with deep sleep disabled
+- Improve MiniNet helper to get IP address
+- Set default maintenance duty cycle to 15 seconds
+- Improve Watchdog subsystem by adjusting to edge cases. Thanks, `@pinguin999`_.
+- Reorder sections when uploading using FTP
+- Add Self-documenting-Makefile helper
+- Improve Pycom firmware installation
+- Slightly document Makefile targets
+- Increase timeout when sending ARP packets for device discovery. Thanks, `@ClemensGruber`_.
+- Slightly adjust "make help". More Makefile improvements.
+- Desktop notifications for MicroTerkin Agent
+- Make MicroTerkin Agent write detected IP address into file
+- Improve Makefile sandbox tooling
+- Prettify logging
+- Optionally start modeserver, defaulting to true
+- Add basic HTTP API subsystem. Thanks `@vkuhlen`_ and `@DieDiren`_.
+- Add ``make provide-wifi`` command for starting the access point interactively
+- Start WiFi in STA_AP mode by default
+- Disable garbage collector when reading sensors to improve timing
+- Improve tooling and inline documentation
+- Add option ``main.fastboot`` for skipping LTE modem teardown
+  for faster development iterations
+- Curate the garbage collector
+- Add backup mechanism for configuration files
+- Fix polling for WiFi connectivity
+- HTTP API: Add basic endpoints for configuration settings
+- Add backup configuration snippet to settings blueprint files
+- Makefile: Prompt for restart after FTP transfer
+- Makefile: Add ``RUNNING_IN_HELL`` flag
+- Makefile: Suppress desktop notifications on Windows for now
+- Makefile-Todo: Use lftp.exe for file transfer on Windows?
+- Extend module search path to "terkin" and "hiveeyes"
+  folders in order to support native Pymakr operation
+- Make reference to "datalogger" object available in global scope
+- Slightly tweak garbage collector curator to collect
+  garbage after computing and setting threshold
+- Add more accessor methods to ``TerkinConfiguration``
+- Add ``get_last_stacktrace`` utility function
+- Fix memory exhaustion when starting the MicroWebSrv twice
+- HTTP API: Add endpoints for getting and setting individual configuration settings
+- Object model refactoring
+- HTTP API: Add endpoint for getting the last reading
+- Refactor ``sensors``-section of configuration settings
+- Settings: Rename sensor "key" attribute to sensor "id"
+- Settings: Rename HX711 enumeration attribute from "address" to "number"
+- Fix broken dependencies re. ``pycopy-collections``
+- Move HTTP API request/response examples to screenshots folder
+- Constructor refactoring and naming things
+- Add ``id`` attribute to bus configuration settings
+- Refactor and improve DS18B20 settings, reading and processing
+- Improve prettified sensor readings log output
+- Improve HTTP API
+- Improve initialization robustness with bus device objects
+- Add ``mpy-cross-util.py``
+- Add ahead-of-time compilation using ``mpy-cross``
+  through ``make recycle-ng MPY_CROSS=true``
+- Refactoring, documentation, cleanups, naming things
+- Improve user experience with ``mpy-mk`` sandbox toolkit. Thanks, `@rohlan`_ and `@ClemensGruber`_.
+  - Fix interactive confirmation
+  - Add advices to guide user on errors
+  - Improve Windows compatibility for the ``ng`` series of commands
+- Add colors to ``mpy-mk``
+- Add note about installing ``pycom-fwtool-cli`` on Linux. Thanks, weef.
+- mpy-mk: Improve operating system detection
+- mpy-mk: Streamline user interface
+- Another attempt at touch button wakeup
+- mpy-mk: Improve cross compilation
+- sensors: Use BME280 library by robert-hh
+- mpy-mk: Add "make colors" for colored output testing on Windows
+- Make MicroTerkin Agent compatible with Python3.5. Thanks, `@rohlan`_.
+- Attempt to automate installation of the modem firmware (WIP). Thanks, `@rohlan`_.
+- Gracefully ignore missing "py-notifier" package on Linux. Thanks, `@rohlan`_.
+- Fix ``scapy`` dependency woes. Thanks, `@rohlan`_.
+- Add tools for building firmware images for ESP32 based on Pycom MicroPython.
+  Thanks, `@emmanuel-florent`_.
+- onewire.py: Use library optimized for timing and with enabled CRC checks by `@robert-hh`_, thanks!
+- First steps with BLE (WIP)
+- First steps with LTE (WIP)
+- Be more graceful when starting network services
+- Wrap "station.isconnected()" to mitigate unhandled exceptions on timeout errors
+- Extend default watchdog timeout to 60 seconds
+- Try two times to connect to WiFi station
+- Makefile improvements
+  - Don't run "mpy-cross-setup" on each invocation of "mpy-compile"
+  - Don't clobber "mpy_cross_all.py"
+- Improve LED signalling
+- Parallelize networking subsystem
+- Prepare real "light sleep" (WIP)
+- Attempt to reset WiFi connection if scanning fails
+- Add "mboot", the universal MicroPython bootloader
+- Reconfigure watchdog when connecting the device using MiniNet
+- Propagate platform information for implementing platform switch conditions
+- Transfer "mboot" bootloader and "mininet" module
+- Start making Terkin platform-agnostic. Thanks, Markus!
+- Add release archives with frozen modules compatible to Pycom MicroPython
 
 
 2019-06-22 0.5.1
@@ -61,13 +195,13 @@ Development
 - Improve Makefile targets
 - Add more wakeup reasons
 - Add missing configuration section for HX711 to settings example.
-  Thanks, @ClemensGruber.
+  Thanks, `@ClemensGruber`_.
 - Add basic device-interval sensors ``SystemTemperature`` and ``SystemBatteryLevel``
 - Explicitly shut down all peripherals having implicitly been turned on
 - Add ``SystemWiFiMetrics`` sensor
 - Add ``SystemUptime`` sensor
 - Fix: Better explicitly initialize the ADC before reading it
-- Improve ``SystemBatteryLevel`` sensor. Thanks, `Dominik <https://github.com/ayoy>`_!
+- Improve ``SystemBatteryLevel`` sensor. Thanks, `@ayoy`_.
 - Make ``TelemetryTransportHTTP`` work again
 - Improve telemetry subsystem re. multi-protocol and -topology. Enable HTTP telemetry.
 - Add configuration example for BEEP-BOB ``settings.example-bob.py``
@@ -237,8 +371,8 @@ Development
 - Add DummySensor
 - Add MemoryFree sensor
 - Update documentation
-- Add vanilla hx711.py by David Gerber
-- Add improved HX711 library by Ralf Lindlein
+- Add vanilla ``hx711.py`` by `David Gerber`_
+- Add improved HX711 library by `Ralf Lindlein`_
 - Improve documentation
 - Code cosmetics, improve logging
 - Add HX711 sensor component
@@ -251,7 +385,7 @@ Development
 - Prepare RTC code
 - Ignore empty sensor readings
 - Naming things, HX711 robustness
-- Add vanilla "dotty_dict" package
+- Add vanilla Dotty Dict package
 - Add basic TTN example
 - TTN for real?
 - Improve configuration system and WiFi STA connectivity
@@ -280,3 +414,16 @@ Development
 - Add .gitignore to exclude `*_local.py` configuration files
 - WIP: Hands on FiPy
 - First stable version
+
+
+.. _David Gerber: https://github.com/geda
+.. _Ralf Lindlein: https://github.com/walterheisenberg
+.. _@ClemensGruber: https://github.com/ClemensGruber
+.. _@MKO1640: https://github.com/MKO1640
+.. _@DieDiren: https://github.com/DieDiren
+.. _@vkuhlen: https://github.com/vkuhlen
+.. _@pawelzny: https://github.com/pawelzny/
+.. _@ayoy: https://github.com/ayoy
+.. _@pinguin999: https://github.com/pinguin999
+.. _@rohlan: https://github.com/rohlan
+.. _@emmanuel-florent: https://github.com/emmanuel-florent

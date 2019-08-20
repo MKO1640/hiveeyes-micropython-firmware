@@ -4,8 +4,12 @@
 *.pyc
 settings.py
 /dist-packages
+/dist-packages-mpy
+/lib-mpy
+/dist-firmwares
 .DS_Store
 /dist
 /var
 /build
 /bin
+.terkin

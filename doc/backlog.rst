@@ -7,6 +7,86 @@ Hiveeyes MicroPython Datalogger backlog
 Datalogger
 **********
 
+
+Miscellaneous
+=============
+- wget ftp.exe
+- [o] Leave maintenance mode after 10 minutes
+- [o] Configure ARP-ping timeout for "terkin.py"
+  https://community.hiveeyes.org/t/running-terkin-py-on-windows/2273/31
+- [o] Add more information to ``make help``
+- Output network config on each cycle in non-deepsleep mode
+- Client wrapper for Terkin HTTP API. e.g. sync files, upload config, restart
+  What about ``terkinctl``?
+- When putting files on the device, maybe halt the program!?
+- Check out switching to
+    - https://github.com/peterhinch/micropython-mqtt
+    - https://github.com/yutter/micropython-mqtt
+- How to catch and report bad things like::
+
+    Traceback (most recent call last):
+      File "main.py", line 31, in <module>
+      File "/flash/lib/hiveeyes/datalogger.py", line 14, in <module>
+      File "/flash/lib/terkin/datalogger.py", line 12, in <module>
+      File "/flash/lib/terkin/configuration.py", line 12, in <module>
+      File "/flash/lib/terkin/util.py", line 151, in <module>
+    NameError: name 'contextmanager' is not defined
+- Pull modeserver into MiniNet. Add reboot functionality to modeserver.
+- Implicitly connect to network on ``make recycle-ng``
+- Automatically connect to console if device is discovered
+- https://github.com/Bucknalla/balena-pycom-ota
+- Detect file transfer errors::
+
+    time lftp -u micro,python 192.168.178.143 < tools/upload-all.lftprc
+    mirror: Access failed: 550  (telemetry.py)
+- ``?overwrite=true`` option or ``DELETE`` action for purging configuration files
+- Curate FTP upload by prewarming the device for transfer to mitigate the 550 errors references above
+- Prevent invalid runtime configuration settings like ``main.interval.field=None``
+- When halting the datalogger using ``CTRL+C``, another ``datalogger.start()`` will register all sensors again ;[
+- Notify user about pulling into maintenance mode
+- Enumerate all DS18B20 sensors and provide over HTTP
+- Write description to prettified sensor output
+- Install from::
+
+    pycopy-collections==0.1.3
+    pycopy-collections.defaultdict==0.3
+
+- MQTT authentication with URI parameter and email address as username does not work
+- Build release packages like https://github.com/adafruit/Adafruit_CircuitPython_BusDevice/releases
+- Windows bundle containing mpy-mk, make.exe, wget.exe, lftp.exe, pycom-fwtool-cli.exe
+- Implement soft-reset using sys.exit(), see https://docs.pycom.io/gettingstarted/programming/safeboot/
+- Add https://forum.pycom.io/topic/3926/ble-att-wrapper
+- Write a characteristic user descriptor
+    - https://stackoverflow.com/questions/33328272/adding-characteristic-user-description-to-custom-c-ble-gatt-service
+    - https://github.com/moovel/gatt-server/blob/master/README.md#implementing-services-with-ggk
+    - https://github.com/adafruit/Adafruit_nRF52_Arduino/blob/68400a76662af268829e3c6c66ae62ac02eaae76/libraries/Bluefruit52Lib/src/BLECharacteristic.cpp#L316-L344
+    - https://github.com/pycom/pycom-micropython-sigfox/blob/master/esp32/mods/modbt.c#L1276-L1290
+
+- Use "hupper" for watching files
+- Remark about "LTE only with antenna"
+  https://forum.pycom.io/topic/4721/working-lte-connection-in-germany/13
+- [o] Move UDP mode server to mininet already
+- http://docs.micropython.org/en/v1.9.3/esp8266/library/btree.html
+
+
+
+Prio 0.9
+========
+- [o] When multiple networks of the same name exist, use the one with the better RSSI::
+
+    INFO:  WiFi STA: Scanning for networks
+    INFO:  WiFi STA: Networks found ['GartenNetzwerk', 'GartenNetzwerk', 'Vodafone-7982', 'hausbuch', 'zrwguests', 'HITRON-9A60']
+    INFO:  WiFi STA: Connecting to "GartenNetzwerk"
+    INFO:  WiFi STA: Connected to "GartenNetzwerk"
+    INFO:  WiFi STA: Connecting to "GartenNetzwerk"
+    INFO:  WiFi STA: Connected to "GartenNetzwerk"
+
+- [o] https://community.hiveeyes.org/t/backlog-terkin-datenlogger-fur-bob/2277
+- [o] https://community.hiveeyes.org/t/remote-logging-zur-ferndiagnose-fur-den-terkin-datenlogger/2280
+- [o] https://community.hiveeyes.org/t/loggen-von-daten-und-error-warning-events-auf-sd/2279
+- [o] https://community.hiveeyes.org/t/http-und-webbasierte-konfiguration-fur-terkin-datenlogger-captive-portal/2270
+- [o] https://community.hiveeyes.org/t/kontinuierliche-verbesserungen-des-terkin-datenloggers-600er/2121
+
 Prio 1
 ======
 - [o] More power saving
@@ -15,13 +95,20 @@ Prio 1
     - [o] Turn off LED-RGB completely
 - [o] WiFi STA: Support connecting to BSSIDs
 - [o] Exponential backoff for WiFi STA, MQTT broker and general connectivity
-- [o] Time-based timeout behavior everything, not just based on retries
+- [o] Time-based timeout behavior for everything, not just based on retries
 - [o] Interpolate Device-ID into telemetry node name or better derive humanized name from it.
       See also https://github.com/HowManyOliversAreThere/six-nibble-name
 - [o] Revisit smoothing of HX711 value
 - [o] Improve HX711 timeout
-- [o] Publish status information at boot time with retained message to MQTT
-- [o] Enable/disable of system- and environmental-sensors
+- [o] Call name support
+- [o] Release names: Murmeltier, Mordillo
+- [o] Release pics
+    - https://commons.wikimedia.org/wiki/File:Agc_view.jpg
+- [o] Current firmware 1.20.0.rc12
+- [o] Build complete firmware, see
+  https://github.com/pycom/pycom-libraries/tree/master/pycom-docker-fw-build
+- [o] Make WiFi-timeout configurable, see ``wifi.py`` at ``network.get('timeout', 15.0)``
+
 
 Prio 1.1
 ========
@@ -269,6 +356,12 @@ Done
     - [x] Turn off serial interface completely
     - [x] Tame LED-RGB
 - [x] Activate Watchdog Timer
+- [x] ``make recycle-ng`` needs network!?
+- [x] WiFi.is_connected would also return True when AP is up!!!
+- [x] Make "make help" point to "Operate the ..."
+- [x] Implement real "light sleep"
+  "in light sleep mode the current consumption on a Lopy is 3.5 mA with RTC peripherals ON"
+  https://forum.pycom.io/topic/3351/new-development-firmware-release-v1-19-0-b1/3
 
 
 
@@ -343,3 +436,20 @@ User interface
 **************
 - https://blog.koley.in/2019/339-bytes-of-responsive-css
   https://news.ycombinator.com/item?id=19622786
+
+
+
+Firmware update output
+======================
+::
+
+    Erased 2 MiB in 15.28 seconds
+    Erased 4MB device flash fs in 1.22 second
+    Wrote 20.95 KiB from bootloader.bin in 1.11 second
+    Wrote 3 KiB from partitions.bin in 0.08 seconds
+    Wrote 1.66 MiB from fipy.bin in 54.4 seconds
+    Wrote 4 KiB from config in 0.1 seconds
+    Device ID: 807D3AC2DE44
+    LoRa MAC: 70B3D54992DBE31D
+    Sigfox ID: 004D4881
+    Sigfox PAC: 211AC57838BF7C29

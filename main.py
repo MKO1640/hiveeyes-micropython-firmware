@@ -8,54 +8,33 @@
 # License: GNU General Public License, Version 3
 #
 """
------
-Setup
------
+Please check https://community.hiveeyes.org/t/operate-the-terkin-datalogger-sandbox/2332
+in order to get an idea how to operate this software sandbox.
 
-Just run::
-
-    make setup
-    make install
-
-to bring everything into shape.
-
-Then, invoke::
-
-    make sketch-and-run
-
-to upload the program and reset the ESP32.
+Have fun!
 """
 
+print('[main.py] INFO: Loading settings')
 import settings
-from terkin import logging
-from hiveeyes.datalogger import HiveeyesDatalogger
 
+print('[main.py] INFO: Starting logging')
+from terkin import logging
 log = logging.getLogger(__name__)
 
 
-class BobDatalogger(HiveeyesDatalogger):
-    """
-    The BOB MicroPython Datalogger.
-    """
-
-    # Naming things.
-    name = 'BOB MicroPython Datalogger'
-
-    def loop(self):
-        """
-        Loop function. Do what I mean.
-        """
-
-        # It's your turn.
-        #log.info('BOB loop')
-
-        # Finally, schedule other system tasks.
-        super().loop()
+# Global reference to Datalogger object.
+datalogger = None
 
 
 def main():
     """Start the data logger application."""
-    datalogger = BobDatalogger(settings)
+    print('[main.py] INFO: Starting Terkin Datalogger')
+    global bootloader
+    global datalogger
+    print('[main.py] INFO: Loading modules')
+    from hiveeyes.datalogger import HiveeyesDatalogger
+    datalogger = HiveeyesDatalogger(settings, platform_info=bootloader.platform_info)
+    datalogger.setup()
     datalogger.start()
 
 

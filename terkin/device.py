@@ -8,10 +8,11 @@ import time
 
 import machine
 
+from mboot import MicroPythonPlatform
 from terkin import logging
-from terkin.pycom import MachineResetCause
 from terkin.telemetry import TelemetryManager, TelemetryAdapter
 from terkin.util import get_device_id
+from terkin.watchdog import Watchdog
 
 log = logging.getLogger(__name__)
 
@@ -21,16 +22,21 @@ class DeviceStatus:
     Object holding device status information.
     """
     def __init__(self):
+        self.maintenance = False
         self.networking = False
 
 
 class TerkinDevice:
 
-    def __init__(self, name=None, version=None, settings=None):
+    def __init__(self, application_info):
 
-        self.name = name
-        self.version = version
-        self.settings = settings
+        self.application_info = application_info
+        self.name = application_info.name
+        self.version = application_info.version
+        self.settings = application_info.settings
+
+        self.status = DeviceStatus()
+        self.watchdog = Watchdog(device=self, settings=self.settings)
 
         # Conditionally enable terminal on UART0. Default: False.
         self.terminal = Terminal(self.settings)
@@ -41,14 +47,7 @@ class TerkinDevice:
         self.networking = None
         self.telemetry = None
 
-        self.wdt = None
         self.rtc = None
-
-        self.status = DeviceStatus()
-
-    @property
-    def appname(self):
-        return '{} {}'.format(self.name, self.version)
 
     def start_networking(self):
         log.info('Starting networking')
@@ -61,14 +60,19 @@ class TerkinDevice:
         try:
             self.networking.start_wifi()
 
-            # Wait for network interface to come up.
-            self.networking.wait_for_nic()
-
-            self.status.networking = True
-
-        except WiFiException:
+        except Exception:
             log.error('Network connectivity not available, WiFi failed')
             self.status.networking = False
+
+        # Wait for network stack to come up.
+        try:
+            self.networking.wait_for_ip_stack(timeout=10)
+            self.status.networking = True
+            self.networking.start_services()
+        except:
+            log.error('IP stack not available')
+            self.status.networking = False
+
 
         # Initialize LoRa device.
         if self.settings.get('networking.lora.antenna_attached'):
@@ -82,33 +86,6 @@ class TerkinDevice:
 
         # Inform about networking status.
         #self.networking.print_status()
-
-    def start_watchdog(self):
-        """
-        The WDT is used to restart the system when the application crashes and
-        ends up into a non recoverable state. After enabling, the application
-        must "feed" the watchdog periodically to prevent it from expiring and
-        resetting the system.
-        """
-        # https://docs.pycom.io/firmwareapi/pycom/machine/wdt.html
-
-        if not self.settings.get('main.watchdog.enabled', False):
-            log.info('Skipping watchdog timer (WDT)')
-            return
-
-        watchdog_timeout = self.settings.get('main.watchdog.timeout', 10000)
-        log.info('Starting the watchdog timer (WDT) with timeout {}ms'.format(watchdog_timeout))
-
-        from machine import WDT
-        self.wdt = WDT(timeout=watchdog_timeout)
-
-        # Feed Watchdog once.
-        self.wdt.feed()
-
-    def feed_watchdog(self):
-        if self.wdt is not None:
-            log.info('Feeding Watchdog')
-            self.wdt.feed()
 
     def start_rtc(self):
         """
@@ -127,77 +104,37 @@ class TerkinDevice:
 
     def run_gc(self):
         """
-        Run a garbage collection.
+        Curate the garbage collector.
         https://docs.pycom.io/firmwareapi/micropython/gc.html
+
+        For a "quick fix", issue the following periodically.
+        https://community.hiveeyes.org/t/timing-things-on-micropython-for-esp32/2329/9
         """
         import gc
+        log.info('Start curating the garbage collector')
+        gc.threshold(gc.mem_free() // 4 + gc.mem_alloc())
         gc.collect()
+        log.info('Curating the garbage collector finished')
 
     def configure_rgb_led(self):
         """
         https://docs.pycom.io/tutorials/all/rgbled.html
         """
-        import pycom
+        if self.application_info.platform_info.vendor == MicroPythonPlatform.Pycom:
+            import pycom
+            # Enable or disable heartbeat.
+            rgb_led_heartbeat = self.settings.get('main.rgb_led.heartbeat', True)
+            pycom.heartbeat(rgb_led_heartbeat)
+            pycom.heartbeat_on_boot(rgb_led_heartbeat)
 
-        # Enable or disable heartbeat.
-        rgb_led_heartbeat = self.settings.get('main.rgb_led.heartbeat', True)
-        pycom.heartbeat(rgb_led_heartbeat)
-        pycom.heartbeat_on_boot(rgb_led_heartbeat)
-
-        # Alternative signalling.
-        # Todo: Run this in a separate thread in order not to delay execution of main program flow.
-        if not rgb_led_heartbeat:
-            for _ in range(2):
-                pycom.rgbled(0x001100)
+    def blink_led(self, color, count=1):
+        if self.application_info.platform_info.vendor == MicroPythonPlatform.Pycom:
+            import pycom
+            for _ in range(count):
+                pycom.rgbled(color)
                 time.sleep(0.15)
                 pycom.rgbled(0x000000)
                 time.sleep(0.10)
-
-    def power_off_lte_modem(self):
-        """
-        We don't use LTE yet.
-
-        https://community.hiveeyes.org/t/lte-modem-des-pycom-fipy-komplett-stilllegen/2161
-        https://forum.pycom.io/topic/4877/deepsleep-on-batteries/10
-        """
-
-        import pycom
-
-        """
-        if not pycom.lte_modem_en_on_boot():
-            log.info('Skip turning off LTE modem')
-            return
-        """
-
-        log.info('Turning off LTE modem')
-        try:
-            from network import LTE
-
-            # Invoking this will cause `LTE.deinit()` to take around 6(!) seconds.
-            #log.info('Enabling LTE modem on boot')
-            #pycom.lte_modem_en_on_boot(True)
-
-            log.info('Turning off LTE modem on boot')
-            pycom.lte_modem_en_on_boot(False)
-
-            log.info('Invoking LTE.deinit()')
-            lte = LTE()
-            lte.deinit()
-
-        except:
-            log.exception('Shutting down LTE modem failed')
-
-    def power_off_bluetooth(self):
-        """
-        We don't use Bluetooth yet.
-        """
-        log.info('Turning off Bluetooth')
-        try:
-            from network import Bluetooth
-            bluetooth = Bluetooth()
-            bluetooth.deinit()
-        except:
-            log.exception('Shutting down Bluetooth failed')
 
     def start_telemetry(self):
         log.info('Starting telemetry')
@@ -217,7 +154,7 @@ class TerkinDevice:
         for telemetry_target in telemetry_candidates:
             try:
                 self.create_telemetry_adapter(telemetry_target)
-                self.feed_watchdog()
+                self.watchdog.feed()
 
             except:
                 log.exception('Creating telemetry adapter failed for target: %s', telemetry_target)
@@ -280,8 +217,9 @@ class TerkinDevice:
         add()
 
         # System memory info (in bytes)
-        machine.info()
-        add()
+        if hasattr(machine, 'info'):
+            machine.info()
+            add()
 
         # TODO: Python runtime information.
         add('{:8}: {}'.format('Python', sys.version))
@@ -307,11 +245,57 @@ class TerkinDevice:
     def power_off(self):
         self.networking.stop()
 
-    def hibernate(self, interval, deep=False):
+    def power_off_lte_modem(self):
+        """
+        We don't use LTE yet.
+
+        https://community.hiveeyes.org/t/lte-modem-des-pycom-fipy-komplett-stilllegen/2161
+        https://forum.pycom.io/topic/4877/deepsleep-on-batteries/10
+        """
+
+        import pycom
+
+        """
+        if not pycom.lte_modem_en_on_boot():
+            log.info('Skip turning off LTE modem')
+            return
+        """
+
+        log.info('Turning off LTE modem')
+        try:
+            from network import LTE
+
+            # Invoking this will cause `LTE.deinit()` to take around 6(!) seconds.
+            #log.info('Enabling LTE modem on boot')
+            #pycom.lte_modem_en_on_boot(True)
+
+            log.info('Turning off LTE modem on boot')
+            pycom.lte_modem_en_on_boot(False)
+
+            log.info('Invoking LTE.deinit()')
+            lte = LTE()
+            lte.deinit()
+
+        except:
+            log.exception('Shutting down LTE modem failed')
+
+    def power_off_bluetooth(self):
+        """
+        We don't use Bluetooth yet.
+        """
+        log.info('Turning off Bluetooth')
+        try:
+            from network import Bluetooth
+            bluetooth = Bluetooth()
+            bluetooth.deinit()
+        except:
+            log.exception('Shutting down Bluetooth failed')
+
+    def hibernate(self, interval, lightsleep=False, deepsleep=False):
 
         #logging.enable_logging()
 
-        if deep:
+        if deepsleep:
 
             # Prepare and invoke deep sleep.
             # https://docs.micropython.org/en/latest/library/machine.html#machine.deepsleep
@@ -328,7 +312,8 @@ class TerkinDevice:
 
         else:
 
-            log.info('Entering light sleep for {} seconds'.format(interval))
+            # Adjust watchdog for interval.
+            self.watchdog.adjust_for_interval(interval)
 
             # Invoke light sleep.
             # https://docs.micropython.org/en/latest/library/machine.html#machine.sleep
@@ -337,10 +322,23 @@ class TerkinDevice:
             # As "machine.sleep" seems to be a noop on Pycom MicroPython,
             # we will just use the regular "time.sleep" here.
             # machine.sleep(int(interval * 1000))
-            time.sleep(interval)
+            machine.idle()
+
+            if lightsleep:
+                log.info('Entering light sleep for {} seconds'.format(interval))
+                machine.sleep(int(interval * 1000))
+
+            else:
+                # Normal wait.
+                log.info('Waiting for {} seconds'.format(interval))
+                time.sleep(interval)
 
     def resume(self):
-        log.info('Reset cause and wakeup reason: %s', MachineResetCause.humanize())
+        try:
+            from terkin.pycom import MachineResetCause
+            log.info('Reset cause and wakeup reason: %s', MachineResetCause.humanize())
+        except:
+            log.warning('Could not determine reset cause')
 
     def set_wakeup_mode(self):
 
@@ -371,7 +369,9 @@ class TerkinDevice:
         # machine.pin_sleep_wakeup(pins=['P8'], mode=machine.WAKEUP_ALL_LOW, enable_pull=True)
 
         # Let's try.
-        #machine.pin_sleep_wakeup(pins=['P8'], mode=machine.WAKEUP_ALL_LOW, enable_pull=False)
+        #log.info('Configuring Pin 4 for wakeup from deep sleep')
+        #machine.pin_sleep_wakeup(pins=['P4'], mode=machine.WAKEUP_ALL_LOW, enable_pull=True)
+        #machine.pin_sleep_wakeup(pins=['P4'], mode=machine.WAKEUP_ANY_HIGH, enable_pull=True)
         pass
 
 

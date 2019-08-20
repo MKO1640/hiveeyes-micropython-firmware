@@ -12,11 +12,14 @@ contributed to this software in one way or another.
 * Diren Senger <diren@uni-bremen.de>
 * Dominik Kapusta <https://github.com/ayoy>
 * Jan Hoffmann <j.hoffmann@isarengineering.de>
+* Markus <https://community.hiveeyes.org/u/poesel>
 * Michael Kurzweil <https://flowers4bees.org/>
 * Ralf Lindlein <https://github.com/walterheisenberg>
 * Richard Pobering <richard@hiveeyes.org>
+* Roh <incognito>
 * Ron Jacob <ron.jacob@easyhive.org>
 * Vincent Kuhlen <vkuhlen@uni-bremen.de>
+* Weef <incognito>
 
 Thanks a bunch!
 
@@ -27,13 +30,14 @@ Acknowledgements
 This program would not have been possible without all the amazing work
 people are doing on the foundation infrastructure the software is leveraging.
 
-- Damien George, Paul Sokolovsky, the whole `MicroPython community`_
-  and all `micropython-lib`_ authors.
+- Damien George, Paul Sokolovsky, Dave Hylands, @stinos and all other
+  `MicroPython core developers`_ and `micropython-lib`_ authors.
 - All contributors to `pycom-micropython-sigfox`_ and `pycom-libraries`_.
 - Daniel Campora for the Pycom MQTT package.
 - David Gerber <https://github.com/geda>, Robert H. <https://github.com/robert-hh> and
   Anthony Hinsinger <https://github.com/atoy40> for the HX711 driver.
-- Paweł Zadrożny <https://github.com/pawelzny> for the ``dotty_dict`` package.
+- Robert H. <https://github.com/robert-hh> for the BME280 driver.
+- Paweł Zadrożny <https://github.com/pawelzny> for the `Dotty Dict`_ package.
 - Sebastian Meiling <https://github.com/smlng> for the ``PyCayenneLPP`` package.
 - Dominik Kapusta <https://github.com/ayoy> for many inspirations
   from the `upython-aq-monitor`_.
@@ -41,11 +45,13 @@ people are doing on the foundation infrastructure the software is leveraging.
 Thank you so much for providing such great infrastructure
 components and resources to the community! You know who you are.
 
-.. _MicroPython community: https://github.com/micropython/micropython/graphs/contributors
+.. _MicroPython core developers: https://github.com/micropython/micropython/graphs/contributors
 .. _micropython-lib: - https://github.com/micropython/micropython-lib
 .. _pycom-micropython-sigfox: https://github.com/pycom/pycom-micropython-sigfox
 .. _pycom-libraries: https://github.com/pycom/pycom-libraries
 .. _upython-aq-monitor: https://github.com/ayoy/upython-aq-monitor
+.. _Dotty Dict: https://github.com/pawelzny/dotty_dict
+
 
 
 **********

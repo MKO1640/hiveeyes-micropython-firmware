@@ -39,29 +39,41 @@ class SensorManager:
     def get_sensor_by_name(self, name):
         raise NotImplementedError('"get_sensor_by_name" not implemented yet')
 
-    def register_busses(self, bus_settings):
+    def setup_busses(self, busses_settings):
         """
         Register configured I2C, OneWire and SPI busses.
         """
-        log.info("Starting all busses %s", bus_settings)
-        for bus in bus_settings:
-            if not bus.get("enabled", False):
+        log.info("Starting all busses %s", busses_settings)
+        for bus_settings in busses_settings:
+
+            if bus_settings.get("enabled") is False:
+                log.info('Bus with id "{}" and family "{}" is disabled, '
+                         'skipping registration'.format(bus_settings.get('id'), bus_settings.get('family')))
                 continue
-            if bus['family'] == BusType.OneWire:
-                owb = OneWireBus(bus["number"])
-                owb.register_pin("data", bus['pin_data'])
-                owb.start()
-                self.register_bus(owb)
 
-            elif bus['family'] == BusType.I2C:
-                i2c = I2CBus(bus["number"])
-                i2c.register_pin("sda", bus['pin_sda'])
-                i2c.register_pin("scl", bus['pin_scl'])
-                i2c.start()
-                self.register_bus(i2c)
+            try:
+                self.setup_bus(bus_settings)
+            except:
+                log.exception('Registering bus failed. settings={}'.format(bus_settings))
 
-            else:
-                log.warning("Invalid bus configuration: %s", bus)
+    def setup_bus(self, bus_settings):
+        bus_family = bus_settings.get('family')
+
+        if bus_family == BusType.OneWire:
+            owb = OneWireBus(bus_settings)
+            owb.register_pin("data", bus_settings['pin_data'])
+            owb.start()
+            self.register_bus(owb)
+
+        elif bus_family == BusType.I2C:
+            i2c = I2CBus(bus_settings)
+            i2c.register_pin("sda", bus_settings['pin_sda'])
+            i2c.register_pin("scl", bus_settings['pin_scl'])
+            i2c.start()
+            self.register_bus(i2c)
+
+        else:
+            log.error("Invalid bus configuration: %s", bus_settings)
 
     def power_on(self):
         self.power_toggle_busses('power_on')
@@ -98,7 +110,11 @@ class AbstractSensor:
 
     SENSOR_NOT_INITIALIZED = object()
 
-    def __init__(self):
+    def __init__(self, settings=None):
+
+        self.settings = settings or {}
+        self.type = self.settings.get('type')
+
         self.name = None
         self.family = None
         self.driver = None
@@ -133,6 +149,9 @@ class AbstractSensor:
         fieldname = '{name}.{address}.{bus}'.format(name=name, address=address, bus=self.bus.name)
         return fieldname
 
+    def serialize(self):
+        return dict(serialize_som(self.__dict__, stringify=['bus']))
+
 
 class BusType:
 
@@ -147,26 +166,35 @@ class AbstractBus:
 
     type = None
 
-    def __init__(self, bus_number):
+    def __init__(self, settings):
         """
         convention <type>:<index>
         """
+        self.settings = settings
+        self.number = self.settings['number']
+
         self.adapter = None
+        # TODO: Publish found 1-Wire devices to MQTT bus and HTTP API.
         self.devices = []
         self.pins = {}
-        self.bus_number = bus_number
 
     @property
     def name(self):
-        return str(self.type) + ":" + str(self.bus_number)
+        return str(self.type) + ":" + str(self.number)
 
     def register_pin(self, name, pin):
         self.pins[name] = pin
 
+    def serialize(self):
+        info = dict(serialize_som(self.__dict__))
+        # FIXME: Why is that?
+        info.update({'name': self.name, 'type': self.type})
+        return info
+
 
 class OneWireBus(AbstractBus):
     """
-    Initialize the OneWire hardware driver and represent as bus object.
+    Initialize the 1-Wire hardware driver and represent as bus object.
     """
 
     type = BusType.OneWire
@@ -177,18 +205,37 @@ class OneWireBus(AbstractBus):
             from onewire.onewire import OneWire
             self.adapter = OneWire(Pin(self.pins['data']))
             self.scan_devices()
+
         except Exception as ex:
-            log.exception('OneWire hardware driver failed')
+            log.exception('1-Wire hardware driver failed')
 
     def scan_devices(self):
         """
-        Resetting the OneWire device in case of leftovers
+        Resetting the 1-Wire device in case of leftovers
         """
         self.adapter.reset()
-        time.sleep(0.750)
-        # Scan for OneWire devices and populate `devices`.
+        # TODO: Tune this further?
+        time.sleep(1)
+        # Scan for 1-Wire devices and populate `devices`.
+        # TODO: Refactor things specific to DS18x20 devices elsewhere.
         self.devices = [rom for rom in self.adapter.scan() if rom[0] == 0x10 or rom[0] == 0x28]
-        log.info("Found {} OneWire (DS18x20) devices: {}.".format(len(self.devices), list(map(hexlify, self.devices))))
+        log.info("Found {} 1-Wire (DS18x20) devices: {}".format(len(self.devices), self.get_devices_ascii()))
+
+    def get_devices_ascii(self):
+        return list(map(self.device_address_ascii, self.devices))
+
+    def serialize(self):
+        info = super().serialize()
+        if 'devices' in info:
+            info['devices'] = self.get_devices_ascii()
+        return info
+
+    @staticmethod
+    def device_address_ascii(address):
+        # Compute ASCII representation of device address.
+        if isinstance(address, (bytearray, bytes)):
+            address = hexlify(address).decode()
+        return address
 
 
 class I2CBus(AbstractBus):
@@ -201,7 +248,7 @@ class I2CBus(AbstractBus):
     def start(self):
         # Todo: Improve error handling.
         try:
-            self.adapter = I2C(self.bus_number, mode=I2C.MASTER, pins=(self.pins['sda'], self.pins['scl']), baudrate=100000)
+            self.adapter = I2C(self.number, mode=I2C.MASTER, pins=(self.pins['sda'], self.pins['scl']), baudrate=100000)
             self.scan_devices()
         except Exception as ex:
             log.exception('I2C hardware driver failed')
@@ -219,3 +266,36 @@ class I2CBus(AbstractBus):
         """
         log.info('Turning off I2C bus {}'.format(self.name))
         self.adapter.deinit()
+
+
+def serialize_som(thing, stringify=None):
+    """
+    Serialize the sensor object model to a representation
+    suitable to be served for the device API.
+    """
+    stringify = stringify or []
+
+    if isinstance(thing, list):
+        hm = []
+        for item in thing:
+            hm.append(serialize_som(item))
+        return hm
+
+    elif isinstance(thing, dict):
+        newthing = {}
+        for key, value in thing.items():
+            if key in stringify:
+                newthing[key] = str(value)
+            else:
+                newthing[key] = serialize_som(value)
+        return newthing
+
+    elif isinstance(thing, (str, int, float, bool, set)) or type(thing) is type(None):
+        return thing
+
+    else:
+        if hasattr(thing, 'serialize'):
+            thing = thing.serialize()
+        else:
+            thing = str(thing)
+        return thing

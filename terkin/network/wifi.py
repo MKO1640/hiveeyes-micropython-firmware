@@ -5,8 +5,10 @@
 import time
 import machine
 import binascii
+import _thread
 from network import WLAN
 from terkin import logging
+from terkin.util import format_mac_address, backoff_time, Stopwatch
 
 log = logging.getLogger(__name__)
 
@@ -22,13 +24,17 @@ class WiFiManager:
         self.station = None
 
     def start(self):
+
+        # Todo: Propagate more parameters here, e.g. for using an external antenna.
+        self.station = WLAN()
+
+        _thread.start_new_thread(self.start_real, ())
+
+    def start_real(self):
         """
         https://docs.pycom.io/tutorials/all/wlan.html
         https://github.com/pycom/pydocs/blob/master/firmwareapi/pycom/network/wlan.md
         """
-
-        # Todo: Propagate more parameters here, e.g. for using an external antenna.
-        self.station = WLAN()
 
         #if machine.reset_cause() == machine.SOFT_RESET:
         #   print("WiFi STA: Network connection after SOFT_RESET.")
@@ -38,14 +44,19 @@ class WiFiManager:
         #    return True
 
         # Save the default ssid and auth for restoring AP mode later
-        original_ssid = self.station.ssid()
-        original_auth = self.station.auth()
+        #original_ssid = self.station.ssid()
+        #original_auth = self.station.auth()
+
+        # Inform about networking status.
+        self.print_address_status()
 
         # Setup network interface.
+        log.info("WiFi STA+AP: Starting interface")
+        self.station.mode(WLAN.STA_AP)
         self.station.init()
 
         # Check WiFi connectivity.
-        if self.station.isconnected():
+        if self.is_connected():
 
             log.info("WiFi STA: Network connection already established, will skip scanning and resume connectivity.")
             self.print_short_status()
@@ -54,6 +65,7 @@ class WiFiManager:
             time.sleep(0.25)
 
             # Inform about networking status.
+            self.print_short_status()
             self.print_address_status()
 
             return True
@@ -61,16 +73,29 @@ class WiFiManager:
         # Prepare information about known WiFi networks.
         networks_known = frozenset([station['ssid'] for station in self.stations])
 
-        log.info("WiFi STA: Starting interface")
-        self.station.mode(WLAN.STA)
-
         # Attempt to connect to known/configured networks.
-        log.info("WiFi STA: Directly connecting to configured networks: %s", list(networks_known))
-        try:
-            self.connect_stations(networks_known)
+        attempt = 0
+        while True:
 
-        except:
-            log.warning('WiFi: Switching to AP mode not implemented yet')
+            delay = 1
+
+            if self.is_connected():
+                attempt = 0
+
+            else:
+                log.info("WiFi STA: Connecting to configured networks: %s. Attempt: #%s", list(networks_known), attempt + 1)
+                try:
+                    self.connect_stations(networks_known)
+
+                except:
+                    log.exception('WiFi STA: Connecting to configured networks "{}" failed'.format(list(networks_known)))
+                    delay = backoff_time(attempt, minimum=1, maximum=600)
+                    log.info('WiFi STA: Retrying in {} seconds'.format(delay))
+
+                attempt += 1
+
+            machine.idle()
+            time.sleep(delay)
 
         # Todo: Reenable WiFi AP mode in the context of an "initial configuration" mode.
         """
@@ -79,6 +104,21 @@ class WiFiManager:
         # TOOD: Make default channel configurable
         self.station.init(mode=WLAN.AP, ssid=original_ssid, auth=original_auth, channel=6, antenna=WLAN.INT_ANT)
         """
+
+    def is_connected(self):
+        try:
+            # ``isconnected()`` returns True when connected to a WiFi access point *and* having a valid IP address.
+            if self.station is not None and self.station.isconnected():
+                ssid = self.get_ssid()
+                if ssid[0] is not None:
+                    ip_address = self.get_ip_address()
+                    if ip_address is not None and ip_address != '0.0.0.0':
+                        return True
+
+        except:
+            log.exception('Invoking "is_connected" failed')
+
+        return False
 
     def power_off(self):
         """
@@ -116,7 +156,7 @@ class WiFiManager:
             except Exception:
                 log.exception('WiFi STA: Connecting to "{}" failed'.format(network_name))
 
-        if not self.station.isconnected():
+        if not self.is_connected():
 
             self.forget_network(network_name)
 
@@ -124,19 +164,19 @@ class WiFiManager:
             description = 'Please check your WiFi configuration for one of the ' \
                           'station candidates {}.'.format(len(network_names))
             log.error('{}. {}'.format(message, description))
-            log.warning('Todo: We might want to switch to AP mode here or alternatively '
-                        'buffer telemetry data to flash to be scheduled for transmission later.')
+            log.warning('Todo: We might want to buffer telemetry data to '
+                        'flash memory to be scheduled for transmission later.')
             raise WiFiException(message)
 
     def connect_station(self, network):
 
         network_name = network['ssid']
 
-        log.info('WiFi STA: Prepare connecting to network "{}"'.format(network_name))
+        log.info('WiFi STA: Getting auth mode for network "{}"'.format(network_name))
 
         auth_mode = self.get_auth_mode(network_name)
 
-        log.info('WiFi STA: Attempt connecting to network "{}" with auth mode "{}"'.format(network_name, auth_mode))
+        log.info('WiFi STA: Preparing connection to network "{}" with auth mode "{}"'.format(network_name, auth_mode))
 
         password = network['password']
 
@@ -159,31 +199,14 @@ class WiFiManager:
         # Obtain timeout value.
         network_timeout = network.get('timeout', 15.0)
 
-        # Set interval how often to poll for WiFi connectivity.
-        network_poll_interval = 800
-
         # Connect to WiFi station.
         log.info('WiFi STA: Starting connection to "{}" with timeout of {} seconds'.format(network_name, network_timeout))
         self.station.connect(network_name, (auth_mode, password), timeout=int(network_timeout * 1000))
 
-        # Wait for station network to arrive.
-        # ``isconnected()`` returns True when connected to a WiFi access point *and* having a valid IP address.
-        retries = int(network_timeout * network_poll_interval)
-        while not self.station.isconnected() and retries > 0:
+        # Wait for network to arrive.
+        self.wait_for_connection(network_timeout)
 
-            log.info('WiFi STA: Waiting for network "{}".'.format(network_name))
-            retries -= 1
-
-            # Save power while waiting.
-            machine.idle()
-
-            # Feed watchdog.
-            self.manager.device.feed_watchdog()
-
-            # Don't busy-wait.
-            time.sleep_ms(network_poll_interval)
-
-        if not self.station.isconnected():
+        if not self.is_connected():
             raise WiFiException('WiFi STA: Unable to connect to "{}"'.format(network_name))
 
         # Inform about networking status.
@@ -192,23 +215,63 @@ class WiFiManager:
 
         return True
 
-    def scan_stations(self):
+    def wait_for_connection(self, timeout=15.0):
+        """
+        Wait for network to arrive.
+        """
 
-        self.manager.device.feed_watchdog()
+        # Set interval how often to poll for WiFi connectivity.
+        network_poll_interval = 250
+
+        # How many checks to make.
+        checks = int(timeout / (network_poll_interval / 1000.0))
+
+        # Stopwatch for keeping track of time.
+        stopwatch = Stopwatch()
+
+        do_report = True
+        while not self.is_connected():
+
+            delta = stopwatch.elapsed()
+            eta = timeout - delta
+
+            if checks <= 0 or eta <= 0:
+                break
+
+            # Report about the progress each 3 seconds.
+            if int(delta) % 3 == 0:
+                if do_report:
+                    log.info('WiFi STA: Waiting for network to come up within {} seconds'.format(eta))
+                    do_report = False
+            else:
+                do_report = True
+
+            # Save power while waiting.
+            machine.idle()
+
+            # Don't busy-wait.
+            time.sleep_ms(network_poll_interval)
+
+            checks -= 1
+
+    def scan_stations(self):
 
         # Inquire visible networks.
         log.info("WiFi STA: Scanning for networks")
-        stations_available = self.station.scan()
+        try:
+            stations_available = self.station.scan()
+        except OSError as ex:
+            if 'Scan operation Failed' in str(ex):
+                log.exception('WiFi STA: Scanning for networks failed')
+                self.station.init()
+
+        # Collect SSIDs of available stations.
         networks_found = frozenset([e.ssid for e in stations_available])
 
         # Print names/SSIDs of networks found.
         log.info("WiFi STA: Networks available: %s", list(networks_found))
 
         return stations_available
-
-        # Compute set of effective networks by intersecting known with found ones.
-        #network_candidates = list(networks_found & networks_known)
-        #log.info("WiFi STA: Network candidates: %s", network_candidates)
 
     def get_ssid(self):
         return self.station.ssid()
@@ -217,7 +280,7 @@ class WiFiManager:
         try:
             return self.station.ifconfig()[0]
         except:
-            pass
+            log.exception('Unable to get device ip address')
 
     def get_auth_mode(self, network_name):
 
@@ -291,9 +354,9 @@ class WiFiManager:
     def humanize_mac_addresses(self, mac):
         info = {}
         if hasattr(mac, 'sta_mac'):
-            info['sta_mac'] = binascii.hexlify(mac.sta_mac).decode().upper()
+            info['sta_mac'] = format_mac_address(binascii.hexlify(mac.sta_mac).decode())
         if hasattr(mac, 'ap_mac'):
-            info['ap_mac'] = binascii.hexlify(mac.ap_mac).decode().upper()
+            info['ap_mac'] = format_mac_address(binascii.hexlify(mac.ap_mac).decode())
         return info
 
     def print_metrics(self):

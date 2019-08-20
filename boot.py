@@ -8,47 +8,24 @@
 # License: GNU General Public License, Version 3
 #
 """
------
-Setup
------
+Please check https://community.hiveeyes.org/t/operate-the-terkin-datalogger-sandbox/2332
+in order to get an idea how to operate this software sandbox.
 
-Just run::
-
-    make setup
-    make install
-
-to bring everything into shape.
-
-Then, invoke::
-
-    make sketch-and-run
-
-to upload the program and reset the ESP32.
+Have fun!
 """
 
 
-def extend_syspath():
-    """
-    Extend Python module search path.
-    Dependency modules are shipped through the "dist-packages" folder.
-    Please populate this folder appropriately as shown above before
-    expecting anything to work.
-    """
-    import sys
-    sys.path.append('dist-packages')
-    #print('[boot.py] INFO: Python module search path is:', sys.path)
+# Global reference to Bootloader object.
+bootloader = None
 
 
 if __name__ == '__main__':
 
-    # Enable heartbeat LED.
-    """
-    try:
-        import pycom
-        pycom.heartbeat(True)
-    except:
-        pass
-    """
+    import sys
+    print('[boot.py] INFO: Python module search path is:', sys.path)
 
     # Extend module search path.
-    extend_syspath()
+    print('[boot.py] INFO: Starting "mboot" bootloader')
+    from mboot import MicroPythonBootloader
+    bootloader = MicroPythonBootloader()
+    bootloader.extend_syspath()
